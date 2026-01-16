@@ -19,17 +19,10 @@ export function NotificationProvider({ children }) {
 
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(50)
-
-      if (error) throw error
-
-      setNotifications(data || [])
-      setUnreadCount((data || []).filter(n => !n.read).length)
+      // DÉSACTIVÉ: Table notifications n'existe pas encore dans Supabase
+      // Activer une fois la table créée dans les migrations
+      setNotifications([])
+      setUnreadCount(0)
     } catch (error) {
       console.error('Error fetching notifications:', error)
     } finally {
@@ -43,83 +36,23 @@ export function NotificationProvider({ children }) {
 
   useEffect(() => {
     if (!user) return
-
-    const channel = supabase
-      .channel('notifications')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${user.id}`
-        },
-        () => {
-          fetchNotifications()
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [user, fetchNotifications])
+    // DÉSACTIVÉ: Realtime notifications - table n'existe pas
+  }, [user])
 
   const markAsRead = useCallback(async (notificationId) => {
-    try {
-      const { error } = await supabase
-        .from('notifications')
-        .update({ read: true })
-        .eq('id', notificationId)
-
-      if (error) throw error
-
-      setNotifications(prev =>
-        prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
-      )
-      setUnreadCount(prev => Math.max(0, prev - 1))
-    } catch (error) {
-      console.error('Error marking notification as read:', error)
-    }
+    // DÉSACTIVÉ: Table notifications n'existe pas
+    console.log('markAsRead désactivé - table notifications manquante')
   }, [])
 
   const markAllAsRead = useCallback(async () => {
-    if (!user) return
-
-    try {
-      const { error } = await supabase
-        .from('notifications')
-        .update({ read: true })
-        .eq('user_id', user.id)
-        .eq('read', false)
-
-      if (error) throw error
-
-      setNotifications(prev => prev.map(n => ({ ...n, read: true })))
-      setUnreadCount(0)
-    } catch (error) {
-      console.error('Error marking all notifications as read:', error)
-    }
-  }, [user])
+    // DÉSACTIVÉ: Table notifications n'existe pas
+    console.log('markAllAsRead désactivé - table notifications manquante')
+  }, [])
 
   const deleteNotification = useCallback(async (notificationId) => {
-    try {
-      const { error } = await supabase
-        .from('notifications')
-        .delete()
-        .eq('id', notificationId)
-
-      if (error) throw error
-
-      setNotifications(prev => prev.filter(n => n.id !== notificationId))
-      setUnreadCount(prev => {
-        const notification = notifications.find(n => n.id === notificationId)
-        return notification && !notification.read ? Math.max(0, prev - 1) : prev
-      })
-    } catch (error) {
-      console.error('Error deleting notification:', error)
-    }
-  }, [notifications])
+    // DÉSACTIVÉ: Table notifications n'existe pas
+    console.log('deleteNotification désactivé - table notifications manquante')
+  }, [])
 
   return (
     <NotificationContext.Provider

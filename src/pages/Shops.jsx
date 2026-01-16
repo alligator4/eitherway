@@ -311,7 +311,7 @@ export default function Shops() {
                 {shop.monthly_rent ? (
                   <div className="flex justify-between">
                     <span className="text-gray-600">Loyer:</span>
-                    <span className="font-medium">${shop.monthly_rent}/mo</span>
+                    <span className="font-medium">{Number(shop.monthly_rent).toLocaleString('fr-FR')} FCFA/mo</span>
                   </div>
                 ) : null}
               </div>
@@ -463,7 +463,7 @@ export default function Shops() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Loyer mensuel ($)
+                    Loyer mensuel (FCFA)
                   </label>
                   <input
                     type="number"

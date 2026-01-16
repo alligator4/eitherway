@@ -27,9 +27,16 @@ export default function Dashboard() {
     fetchDashboardData()
   }, [])
 
-  const formatMoney = (amount, currency = 'EUR') => {
+  const formatMoney = (amount, currency = 'XAF') => {
     const n = Number(amount)
     if (Number.isNaN(n)) return '-'
+    
+    // Format spécial pour FCFA
+    if (currency === 'XAF') {
+      return `${n.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} FCFA`
+    }
+    
+    // Pour les autres devises, utiliser le format standard
     try {
       return new Intl.NumberFormat('fr-FR', { style: 'currency', currency }).format(n)
     } catch {
@@ -40,31 +47,41 @@ export default function Dashboard() {
   const fetchDashboardData = async () => {
     setLoading(true)
     try {
+      console.log('🔍 Chargement dashboard...')
+      
       const [shopsRes, tenantsRes, contractsRes] = await Promise.all([
-        supabase.from('shops').select('id', { count: 'exact' }),
+        supabase.from('shops').select('id, status', { count: 'exact' }),
         supabase
           .from('tenants')
           .select('id', { count: 'exact' })
-          .eq('status', 'active'),
+          .eq('active', true),
         supabase
           .from('contracts')
-          .select(
-            'id, rent_amount, currency, end_date, status, tenant_id, shop_id, tenant:tenants(name), shop:shops(shop_number, name)',
-            { count: 'exact' }
-          )
+          .select('*', { count: 'exact' })
           .eq('status', 'active'),
       ])
 
-      if (shopsRes.error) throw shopsRes.error
-      if (tenantsRes.error) throw tenantsRes.error
-      if (contractsRes.error) throw contractsRes.error
+      if (shopsRes.error) {
+        console.error('❌ Erreur shops:', shopsRes.error)
+        throw shopsRes.error
+      }
+      if (tenantsRes.error) {
+        console.error('❌ Erreur tenants:', tenantsRes.error)
+        throw tenantsRes.error
+      }
+      if (contractsRes.error) {
+        console.error('❌ Erreur contracts:', contractsRes.error)
+        throw contractsRes.error
+      }
 
       const totalShops = shopsRes.count || 0
       const totalTenants = tenantsRes.count || 0
       const activeContracts = contractsRes.count || 0
 
       const contracts = Array.isArray(contractsRes.data) ? contractsRes.data : []
-      const monthlyRevenue = contracts.reduce((sum, c) => sum + Number(c.rent_amount || 0), 0)
+      const monthlyRevenue = contracts.reduce((sum, c) => sum + Number(c.monthly_rent || 0), 0)
+
+      console.log('✅ Stats:', { totalShops, totalTenants, activeContracts, monthlyRevenue })
 
       const ninetyDaysFromNow = format(addDays(new Date(), 90), 'yyyy-MM-dd')
       const expiring = contracts
@@ -75,16 +92,18 @@ export default function Dashboard() {
       const today = format(new Date(), 'yyyy-MM-dd')
       const overdueRes = await supabase
         .from('invoices')
-        .select(
-          'id, invoice_number, tenant_id, amount_total, currency, due_date, status, tenant:tenants(name), shop:shops(shop_number, name)',
-          { count: 'exact' }
-        )
+        .select('*', { count: 'exact' })
         .in('status', ['unpaid', 'partial', 'overdue'])
         .lt('due_date', today)
         .order('due_date', { ascending: true })
         .limit(5)
 
-      if (overdueRes.error) throw overdueRes.error
+      if (overdueRes.error) {
+        console.error('❌ Erreur invoices:', overdueRes.error)
+        throw overdueRes.error
+      }
+
+      console.log('✅ Factures en retard:', overdueRes.data?.length || 0)
 
       setStats({
         totalShops,
@@ -158,7 +177,7 @@ export default function Dashboard() {
             <div>
               <p className="text-purple-100 text-sm font-medium">Revenu mensuel</p>
               <p className="text-3xl font-bold mt-1">
-                {formatMoney(stats.monthlyRevenue, 'EUR')}
+                {formatMoney(stats.monthlyRevenue, 'XAF')}
               </p>
               <p className="text-purple-100 text-sm mt-2">Somme des loyers actifs</p>
             </div>
@@ -191,21 +210,16 @@ export default function Dashboard() {
             <div className="space-y-3">
               {expiringContractsUi.map((c) => {
                 const daysLeft = differenceInDays(new Date(c.end_date), new Date())
-                const tenantName = c.tenant?.name || 'Locataire'
-                const shopLabel = c.shop?.shop_number || c.shop?.name || 'Local'
 
                 return (
                   <div key={c.id} className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
                     <div>
-                      <p className="font-medium text-gray-900">{tenantName}</p>
-                      <p className="text-sm text-gray-600">Local: {shopLabel}</p>
+                      <p className="font-medium text-gray-900">Contrat #{c.id.substring(0, 8)}</p>
+                      <p className="text-sm text-gray-600">Expire le {format(new Date(c.end_date), 'dd/MM/yyyy')}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-medium text-orange-600">
                         {daysLeft >= 0 ? `${daysLeft} jours restants` : 'Expiré'}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {format(new Date(c.end_date), 'dd/MM/yyyy')}
                       </p>
                     </div>
                   </div>
@@ -227,18 +241,16 @@ export default function Dashboard() {
             <div className="space-y-3">
               {overdueInvoicesUi.map((inv) => {
                 const daysOverdue = differenceInDays(new Date(), new Date(inv.due_date))
-                const tenantName = inv.tenant?.name || 'Locataire'
                 return (
                   <div key={inv.id} className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
                     <div>
-                      <p className="font-medium text-gray-900">{tenantName}</p>
-                      <p className="text-sm text-gray-600">{inv.invoice_number}</p>
+                      <p className="font-medium text-gray-900">Facture #{inv.invoice_number}</p>
+                      <p className="text-sm text-gray-600">Échue depuis {daysOverdue} jours</p>
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-bold text-red-600">
-                        {formatMoney(inv.amount_total, inv.currency || 'EUR')}
+                        {formatMoney(inv.amount_total, inv.currency || 'XAF')}
                       </p>
-                      <p className="text-xs text-red-500">{daysOverdue} jours de retard</p>
                     </div>
                   </div>
                 )

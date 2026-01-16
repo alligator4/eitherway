@@ -89,14 +89,17 @@ export default function ShopModal({ shop, onClose, onSuccess }) {
 
   const createContract = async (shopId, tenantId, monthlyRent) => {
     try {
-      const { data: existingContract } = await supabase
+      const { data: existingContracts, error: checkError } = await supabase
         .from('contracts')
         .select('id')
         .eq('shop_id', shopId)
         .eq('status', 'active')
-        .single()
 
-      if (existingContract) {
+      if (checkError) {
+        console.error('Erreur vérification contrat:', checkError)
+      }
+
+      if (existingContracts && existingContracts.length > 0) {
         console.log('Un contrat actif existe déjà pour ce local')
         return
       }
@@ -145,6 +148,31 @@ export default function ShopModal({ shop, onClose, onSuccess }) {
         setError('Veuillez sélectionner un locataire pour un local occupé.')
         setLoading(false)
         return
+      }
+
+      // VÉRIFICATION: Empêcher la double réservation
+      if (formData.status === 'occupied' && formData.tenant_id) {
+        const { data: existingContracts, error: checkError } = await supabase
+          .from('contracts')
+          .select('id, shop_id, tenant_id, shop:shops!shop_id(shop_number, name)')
+          .eq('shop_id', shop?.id)
+          .eq('status', 'active')
+
+        if (checkError) {
+          console.error('Erreur vérification contrat:', checkError)
+        }
+
+        if (existingContracts && existingContracts.length > 0) {
+          const existing = existingContracts[0]
+          const shopName = existing.shop?.shop_number || existing.shop?.name || 'ce local'
+          
+          // Si c'est le même locataire, on peut continuer
+          if (existing.tenant_id !== formData.tenant_id) {
+            setError(`Ce local est déjà occupé par un autre locataire. Veuillez d'abord résilier le contrat actif.`)
+            setLoading(false)
+            return
+          }
+        }
       }
 
       const shopData = {
@@ -349,7 +377,7 @@ export default function ShopModal({ shop, onClose, onSuccess }) {
             </div>
 
             <div>
-              <label className="label">Loyer mensuel (optionnel)</label>
+              <label className="label">Loyer mensuel FCFA (optionnel)</label>
               <input
                 type="number"
                 step="0.01"

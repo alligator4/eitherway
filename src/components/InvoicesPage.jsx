@@ -27,31 +27,91 @@ export default function InvoicesPage() {
   const fetchInvoices = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase
+      console.log('🔍 Chargement des factures...')
+      
+      // Charger les factures d'abord
+      const { data: invoicesData, error: invoicesError } = await supabase
         .from('invoices')
-        .select(`
-          id,
-          invoice_number,
-          contract_id,
-          tenant_id,
-          shop_id,
-          issue_date,
-          due_date,
-          amount_total,
-          currency,
-          status,
-          description,
-          created_at,
-          tenant:tenants(id, company_name, contact_name, email),
-          shop:shops(id, shop_number, name),
-          contract:contracts(id, title)
-        `)
+        .select('*')
         .order('issue_date', { ascending: false })
 
-      if (error) throw error
-      setInvoices(Array.isArray(data) ? data : [])
+      if (invoicesError) {
+        console.error('❌ Erreur chargement factures:', invoicesError)
+        throw invoicesError
+      }
+
+      console.log('✅ Factures brutes chargées:', invoicesData?.length || 0)
+
+      if (!invoicesData || invoicesData.length === 0) {
+        setInvoices([])
+        return
+      }
+
+      // Récupérer tous les IDs uniques
+      const tenantIds = [...new Set(invoicesData.map(i => i.tenant_id).filter(Boolean))]
+      const shopIds = [...new Set(invoicesData.map(i => i.shop_id).filter(Boolean))]
+      const contractIds = [...new Set(invoicesData.map(i => i.contract_id).filter(Boolean))]
+
+      // Charger les locataires
+      let tenantsMap = {}
+      if (tenantIds.length > 0) {
+        const { data: tenantsData, error: tenantsError } = await supabase
+          .from('tenants')
+          .select('id, company_name, contact_name, email')
+          .in('id', tenantIds)
+
+        if (tenantsError) {
+          console.error('❌ Erreur chargement locataires:', tenantsError)
+        } else {
+          tenantsMap = Object.fromEntries((tenantsData || []).map(t => [t.id, t]))
+          console.log('✅ Locataires chargés:', tenantsData?.length || 0)
+        }
+      }
+
+      // Charger les locaux
+      let shopsMap = {}
+      if (shopIds.length > 0) {
+        const { data: shopsData, error: shopsError } = await supabase
+          .from('shops')
+          .select('id, shop_number, name')
+          .in('id', shopIds)
+
+        if (shopsError) {
+          console.error('❌ Erreur chargement locaux:', shopsError)
+        } else {
+          shopsMap = Object.fromEntries((shopsData || []).map(s => [s.id, s]))
+          console.log('✅ Locaux chargés:', shopsData?.length || 0)
+        }
+      }
+
+      // Charger les contrats
+      let contractsMap = {}
+      if (contractIds.length > 0) {
+        const { data: contractsData, error: contractsError } = await supabase
+          .from('contracts')
+          .select('id, title')
+          .in('id', contractIds)
+
+        if (contractsError) {
+          console.error('❌ Erreur chargement contrats:', contractsError)
+        } else {
+          contractsMap = Object.fromEntries((contractsData || []).map(c => [c.id, c]))
+          console.log('✅ Contrats chargés:', contractsData?.length || 0)
+        }
+      }
+
+      // Joindre les données manuellement
+      const enrichedInvoices = invoicesData.map(invoice => ({
+        ...invoice,
+        tenant: tenantsMap[invoice.tenant_id] || null,
+        shop: shopsMap[invoice.shop_id] || null,
+        contract: contractsMap[invoice.contract_id] || null,
+      }))
+
+      console.log('✅ Factures enrichies:', enrichedInvoices.length, enrichedInvoices)
+      setInvoices(enrichedInvoices)
     } catch (error) {
-      console.error('Erreur lors du chargement des factures:', error)
+      console.error('❌ Exception chargement factures:', error)
       setInvoices([])
     } finally {
       setLoading(false)
@@ -94,7 +154,8 @@ export default function InvoicesPage() {
       const matchesSearch =
         !q ||
         (inv.invoice_number || '').toLowerCase().includes(q) ||
-        (inv.tenant?.name || '').toLowerCase().includes(q) ||
+        (inv.tenant?.company_name || '').toLowerCase().includes(q) ||
+        (inv.tenant?.contact_name || '').toLowerCase().includes(q) ||
         (inv.contract?.title || '').toLowerCase().includes(q)
 
       const matchesStatus = statusFilter === 'all' || inv.status === statusFilter
@@ -124,9 +185,16 @@ export default function InvoicesPage() {
     return <span className={`badge ${styles[s] || 'badge-info'}`}>{statusLabel(s)}</span>
   }
 
-  const formatMoney = (amount, currency = 'EUR') => {
+  const formatMoney = (amount, currency = 'XAF') => {
     const n = Number(amount)
     if (Number.isNaN(n)) return '-'
+    
+    // Format spécial pour FCFA
+    if (currency === 'XAF') {
+      return `${n.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} FCFA`
+    }
+    
+    // Pour les autres devises, utiliser le format standard
     try {
       return new Intl.NumberFormat('fr-FR', { style: 'currency', currency }).format(n)
     } catch {
@@ -191,21 +259,21 @@ export default function InvoicesPage() {
         <div className="card bg-gradient-to-br from-blue-500 to-blue-600 text-white">
           <p className="text-blue-100 text-sm font-medium mb-1">Total facturé</p>
           <p className="text-3xl font-bold">
-            {formatMoney(getTotalStats.total, 'EUR')}
+            {formatMoney(getTotalStats.total, 'XAF')}
           </p>
         </div>
 
         <div className="card bg-gradient-to-br from-green-500 to-green-600 text-white">
           <p className="text-green-100 text-sm font-medium mb-1">Payé</p>
           <p className="text-3xl font-bold">
-            {formatMoney(getTotalStats.paid, 'EUR')}
+            {formatMoney(getTotalStats.paid, 'XAF')}
           </p>
         </div>
 
         <div className="card bg-gradient-to-br from-orange-500 to-orange-600 text-white">
           <p className="text-orange-100 text-sm font-medium mb-1">À encaisser</p>
           <p className="text-3xl font-bold">
-            {formatMoney(getTotalStats.pending, 'EUR')}
+            {formatMoney(getTotalStats.pending, 'XAF')}
           </p>
         </div>
       </div>
@@ -247,7 +315,7 @@ export default function InvoicesPage() {
                   <FileText className="w-6 h-6 text-primary-600" />
                   <div>
                     <h3 className="text-lg font-bold text-gray-900">{inv.invoice_number}</h3>
-                    <p className="text-sm text-gray-600">{inv.tenant?.name || '-'}</p>
+                    <p className="text-sm text-gray-600">{inv.tenant?.company_name || '-'}</p>
                   </div>
                   {getStatusBadge(inv.status)}
                 </div>
@@ -271,7 +339,7 @@ export default function InvoicesPage() {
                   <div>
                     <p className="text-sm text-gray-600 mb-1">Montant</p>
                     <p className="text-xl font-bold text-green-600">
-                      {formatMoney(inv.amount_total, inv.currency || 'EUR')}
+                      {formatMoney(inv.amount_total, inv.currency || 'XAF')}
                     </p>
                   </div>
                 </div>

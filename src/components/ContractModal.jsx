@@ -10,7 +10,7 @@ export default function ContractModal({ contract, onClose, onSuccess }) {
     start_date: '',
     end_date: '',
     rent_amount: '',
-    currency: 'EUR',
+    currency: 'XAF',
     status: 'active',
     notes: '',
   })
@@ -36,7 +36,7 @@ export default function ContractModal({ contract, onClose, onSuccess }) {
           contract.rent_amount === null || contract.rent_amount === undefined
             ? ''
             : String(contract.rent_amount),
-        currency: contract.currency || 'EUR',
+        currency: contract.currency || 'XAF',
         status: contract.status || 'active',
         notes: contract.notes || '',
       })
@@ -49,7 +49,7 @@ export default function ContractModal({ contract, onClose, onSuccess }) {
       start_date: '',
       end_date: '',
       rent_amount: '',
-      currency: 'EUR',
+      currency: 'XAF',
       status: 'active',
       notes: '',
     }))
@@ -114,7 +114,7 @@ export default function ContractModal({ contract, onClose, onSuccess }) {
         start_date: formData.start_date,
         end_date: formData.end_date || null,
         rent_amount: rent,
-        currency: formData.currency || 'EUR',
+        currency: formData.currency || 'XAF',
         status: formData.status || 'active',
         notes: (formData.notes || '').trim() || null,
       }
@@ -214,9 +214,9 @@ export default function ContractModal({ contract, onClose, onSuccess }) {
                   onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
                   className="input-field"
                 >
+                  <option value="XAF">FCFA (XAF)</option>
                   <option value="EUR">EUR</option>
                   <option value="USD">USD</option>
-                  <option value="XAF">XAF</option>
                   <option value="MAD">MAD</option>
                 </select>
               </div>

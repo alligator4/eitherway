@@ -74,9 +74,16 @@ export default function ShopsPage() {
     )
   }
 
-  const formatMoney = (amount, currency = 'EUR') => {
+  const formatMoney = (amount, currency = 'XAF') => {
     const n = Number(amount)
     if (Number.isNaN(n)) return '-'
+    
+    // Format spécial pour FCFA
+    if (currency === 'XAF') {
+      return `${n.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} FCFA`
+    }
+    
+    // Pour les autres devises, utiliser le format standard
     try {
       return new Intl.NumberFormat('fr-FR', { style: 'currency', currency }).format(n)
     } catch {
@@ -195,7 +202,7 @@ export default function ShopsPage() {
               {shop.monthly_rent !== null && shop.monthly_rent !== undefined && shop.monthly_rent !== '' ? (
                 <div className="flex justify-between">
                   <span className="text-gray-600">Loyer mensuel</span>
-                  <span className="font-bold text-green-600">{formatMoney(shop.monthly_rent, 'EUR')}</span>
+                  <span className="font-bold text-green-600">{formatMoney(shop.monthly_rent, 'XAF')}</span>
                 </div>
               ) : null}
             </div>

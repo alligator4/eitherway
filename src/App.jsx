@@ -12,14 +12,11 @@ import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import TestPasswordReset from './pages/TestPasswordReset'
 import Dashboard from './pages/Dashboard'
-import Users from './pages/Users'
 import Layout from './components/Layout'
 import ShopsPage from './pages/Shops'
 import TenantsPage from './pages/Tenants'
 import ContractsPage from './components/ContractsPage'
 import InvoicesPage from './components/InvoicesPage'
-import PaymentsPage from './components/PaymentsPage'
-import ActivityLogsPage from './components/ActivityLogsPage'
 
 function AppContent() {
   const { loading } = useAuth()
@@ -35,6 +32,7 @@ function AppContent() {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/test-password-reset" element={<TestPasswordReset />} />
+      <Route path="/test-contracts" element={<TestContracts />} />
 
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route path="/" element={<Dashboard />} />
@@ -65,29 +63,6 @@ function AppContent() {
         <Route
           path="/invoices"
           element={<InvoicesPage />}
-        />
-
-        <Route
-          path="/payments"
-          element={<PaymentsPage />}
-        />
-
-        <Route
-          path="/logs"
-          element={
-            <ProtectedRoute allowedRoles={['admin']}>
-              <ActivityLogsPage />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/users"
-          element={
-            <ProtectedRoute allowedRoles={['admin']}>
-              <Users />
-            </ProtectedRoute>
-          }
         />
       </Route>
 

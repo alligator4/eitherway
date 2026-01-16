@@ -13,7 +13,7 @@ export default function InvoiceModal({ invoice, onClose, onSuccess }) {
     issue_date: today,
     due_date: nextMonth,
     amount_total: '',
-    currency: 'EUR',
+    currency: 'XAF',
     status: 'unpaid',
     description: '',
   })
@@ -35,7 +35,7 @@ export default function InvoiceModal({ invoice, onClose, onSuccess }) {
           invoice.amount_total === null || invoice.amount_total === undefined
             ? ''
             : String(invoice.amount_total),
-        currency: invoice.currency || 'EUR',
+        currency: invoice.currency || 'XAF',
         status: invoice.status || 'unpaid',
         description: invoice.description || '',
       })
@@ -92,7 +92,7 @@ export default function InvoiceModal({ invoice, onClose, onSuccess }) {
     setFormData((prev) => ({
       ...prev,
       contract_id: contractId,
-      currency: c.currency || prev.currency || 'EUR',
+      currency: c.currency || prev.currency || 'XAF',
       amount_total:
         c.rent_amount === null || c.rent_amount === undefined
           ? prev.amount_total
@@ -143,7 +143,7 @@ export default function InvoiceModal({ invoice, onClose, onSuccess }) {
         issue_date: formData.issue_date,
         due_date: formData.due_date,
         amount_total: amount,
-        currency: formData.currency || 'EUR',
+        currency: formData.currency || 'XAF',
         status: formData.status || 'unpaid',
         description: (formData.description || '').trim() || null,
       }
@@ -177,8 +177,14 @@ export default function InvoiceModal({ invoice, onClose, onSuccess }) {
     return n
   }, [formData.amount_total])
 
-  const currencyPreview = formData.currency || 'EUR'
+  const currencyPreview = formData.currency || 'XAF'
   const formatMoney = (n) => {
+    // Format spécial pour FCFA
+    if (currencyPreview === 'XAF') {
+      return `${n.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} FCFA`
+    }
+    
+    // Pour les autres devises
     try {
       return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: currencyPreview }).format(n)
     } catch {
@@ -293,9 +299,9 @@ export default function InvoiceModal({ invoice, onClose, onSuccess }) {
                   onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
                   className="input-field"
                 >
+                  <option value="XAF">FCFA (XAF)</option>
                   <option value="EUR">EUR</option>
                   <option value="USD">USD</option>
-                  <option value="XAF">XAF</option>
                   <option value="MAD">MAD</option>
                 </select>
               </div>

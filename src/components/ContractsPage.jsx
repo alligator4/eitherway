@@ -27,29 +27,73 @@ export default function ContractsPage() {
   const fetchContracts = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase
+      console.log('🔍 Chargement des contrats...')
+      
+      // Charger les contrats d'abord
+      const { data: contractsData, error: contractsError } = await supabase
         .from('contracts')
-        .select(`
-          id,
-          shop_id,
-          tenant_id,
-          title,
-          start_date,
-          end_date,
-          rent_amount,
-          currency,
-          status,
-          notes,
-          created_at,
-          tenant:tenants(id, company_name, contact_name, email, status),
-          shop:shops(id, name, shop_number, floor, location)
-        `)
+        .select('*')
         .order('created_at', { ascending: false })
 
-      if (error) throw error
-      setContracts(Array.isArray(data) ? data : [])
+      if (contractsError) {
+        console.error('❌ Erreur chargement contrats:', contractsError)
+        throw contractsError
+      }
+
+      console.log('✅ Contrats bruts chargés:', contractsData?.length || 0)
+
+      if (!contractsData || contractsData.length === 0) {
+        setContracts([])
+        return
+      }
+
+      // Récupérer tous les tenant_ids et shop_ids uniques
+      const tenantIds = [...new Set(contractsData.map(c => c.tenant_id).filter(Boolean))]
+      const shopIds = [...new Set(contractsData.map(c => c.shop_id).filter(Boolean))]
+
+      // Charger les locataires
+      let tenantsMap = {}
+      if (tenantIds.length > 0) {
+        const { data: tenantsData, error: tenantsError } = await supabase
+          .from('tenants')
+          .select('id, company_name, contact_name, email, active')
+          .in('id', tenantIds)
+
+        if (tenantsError) {
+          console.error('❌ Erreur chargement locataires:', tenantsError)
+        } else {
+          tenantsMap = Object.fromEntries((tenantsData || []).map(t => [t.id, t]))
+          console.log('✅ Locataires chargés:', tenantsData?.length || 0)
+        }
+      }
+
+      // Charger les locaux
+      let shopsMap = {}
+      if (shopIds.length > 0) {
+        const { data: shopsData, error: shopsError } = await supabase
+          .from('shops')
+          .select('id, name, shop_number, floor, location')
+          .in('id', shopIds)
+
+        if (shopsError) {
+          console.error('❌ Erreur chargement locaux:', shopsError)
+        } else {
+          shopsMap = Object.fromEntries((shopsData || []).map(s => [s.id, s]))
+          console.log('✅ Locaux chargés:', shopsData?.length || 0)
+        }
+      }
+
+      // Joindre les données manuellement
+      const enrichedContracts = contractsData.map(contract => ({
+        ...contract,
+        tenant: tenantsMap[contract.tenant_id] || null,
+        shop: shopsMap[contract.shop_id] || null,
+      }))
+
+      console.log('✅ Contrats enrichis:', enrichedContracts.length, enrichedContracts)
+      setContracts(enrichedContracts)
     } catch (error) {
-      console.error('Erreur lors du chargement des contrats:', error)
+      console.error('❌ Exception chargement contrats:', error)
       setContracts([])
     } finally {
       setLoading(false)
@@ -74,7 +118,8 @@ export default function ContractsPage() {
 
     return contracts.filter((c) => {
       const title = (c.title || '').toLowerCase()
-      const tenantName = (c.tenant?.name || '').toLowerCase()
+      const tenantName = (c.tenant?.company_name || '').toLowerCase()
+      const tenantContact = (c.tenant?.contact_name || '').toLowerCase()
       const shopNumber = (c.shop?.shop_number || '').toString().toLowerCase()
       const shopName = (c.shop?.name || '').toLowerCase()
 
@@ -82,6 +127,7 @@ export default function ContractsPage() {
         !q ||
         title.includes(q) ||
         tenantName.includes(q) ||
+        tenantContact.includes(q) ||
         shopNumber.includes(q) ||
         shopName.includes(q)
 
@@ -150,9 +196,16 @@ export default function ContractsPage() {
     return `Local ${shop.id.substring(0, 8)}...`
   }
 
-  const formatMoney = (amount, currency = 'EUR') => {
+  const formatMoney = (amount, currency = 'XAF') => {
     const n = Number(amount)
     if (Number.isNaN(n)) return '-'
+    
+    // Format spécial pour FCFA
+    if (currency === 'XAF') {
+      return `${n.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} FCFA`
+    }
+    
+    // Pour les autres devises, utiliser le format standard
     try {
       return new Intl.NumberFormat('fr-FR', { style: 'currency', currency }).format(n)
     } catch {
@@ -240,7 +293,10 @@ export default function ContractsPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                     <div>
                       <p className="text-sm text-gray-600 mb-1">Locataire</p>
-                      <p className="font-medium">{c.tenant?.name || '-'}</p>
+                      <p className="font-medium">{c.tenant?.company_name || '-'}</p>
+                      {c.tenant?.contact_name ? (
+                        <p className="text-xs text-gray-500">{c.tenant.contact_name}</p>
+                      ) : null}
                       {c.tenant?.email ? (
                         <p className="text-xs text-gray-500">{c.tenant.email}</p>
                       ) : null}

@@ -60,21 +60,19 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     aliveRef.current = true
+    let isSubscribed = true
 
     const init = async () => {
+      if (!isSubscribed) return
       setLoading(true)
+      
       try {
-        const sessionPromise = supabase.auth.getSession()
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Session retrieval timeout')), 10000)
-        )
-
-        const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise])
+        const { data: { session }, error } = await supabase.auth.getSession()
         if (error) throw error
 
-        const u = session?.user ?? null
-        if (!aliveRef.current) return
+        if (!isSubscribed || !aliveRef.current) return
 
+        const u = session?.user ?? null
         setUser(u)
 
         if (u) {
@@ -82,50 +80,81 @@ export function AuthProvider({ children }) {
         } else {
           setProfile(null)
         }
+        
+        initializedRef.current = true
       } catch (err) {
-        if (!aliveRef.current) return
+        if (!isSubscribed || !aliveRef.current) return
         console.error('[AuthContext] init error:', err)
         setUser(null)
         setProfile(null)
       } finally {
-        if (!aliveRef.current) return
-        setLoading(false)
+        if (isSubscribed && aliveRef.current) {
+          setLoading(false)
+        }
       }
     }
 
     init()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!initializedRef.current) {
-        initializedRef.current = true
-        return // Skip the first call since init() already handled it
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!isSubscribed || !initializedRef.current) return
+
+      // Ignorer TOKEN_REFRESHED et INITIAL_SESSION
+      if (event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+        return
       }
 
-      setLoading(true)
+      console.log('[AuthContext] Auth change:', event)
 
+      // Pour SIGNED_IN, vérifier si c'est le même utilisateur
+      if (event === 'SIGNED_IN') {
+        const newUserId = session?.user?.id
+        const currentUserId = user?.id
+        if (newUserId && newUserId === currentUserId) {
+          console.log('[AuthContext] Skip reload - même user')
+          return
+        }
+      }
+
+      // Pour SIGNED_OUT, nettoyer immédiatement SANS loading
+      if (event === 'SIGNED_OUT') {
+        if (!isSubscribed) return
+        setUser(null)
+        setProfile(null)
+        return
+      }
+
+      // Pour USER_UPDATED, juste refresh le profil SANS loading
+      if (event === 'USER_UPDATED') {
+        if (!isSubscribed) return
+        const u = session?.user ?? null
+        if (u && u.id === user?.id) {
+          // Même user, juste refresh le profil en arrière-plan
+          fetchProfile(u.id)
+          return
+        }
+      }
+
+      // Pour les autres événements, ne PAS afficher loading
+      if (!isSubscribed) return
+      
       const u = session?.user ?? null
-      if (!aliveRef.current) return
-
       setUser(u)
 
       if (u) {
         try {
           await fetchProfile(u.id)
         } catch (err) {
-          if (!aliveRef.current) return
-          console.error('[AuthContext] onAuthStateChange fetchProfile error:', err)
+          console.error('[AuthContext] Profile fetch error:', err)
           setProfile(null)
         }
       } else {
-        fetchTokenRef.current++
         setProfile(null)
       }
-
-      if (!aliveRef.current) return
-      setLoading(false)
     })
 
     return () => {
+      isSubscribed = false
       aliveRef.current = false
       subscription?.unsubscribe()
     }

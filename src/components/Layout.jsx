@@ -32,9 +32,6 @@ export default function Layout() {
     { name: 'Locataires', href: '/tenants', icon: Users, roles: ['admin', 'manager'] },
     { name: 'Contrats', href: '/contracts', icon: FileText, roles: ['admin', 'manager'] },
     { name: 'Factures', href: '/invoices', icon: Receipt, roles: ['admin', 'manager', 'accountant'] },
-    { name: 'Paiements', href: '/payments', icon: CreditCard, roles: ['admin', 'manager', 'accountant'] },
-    { name: 'Utilisateurs', href: '/users', icon: UserCog, roles: ['admin'] },
-    { name: 'Journal activite', href: '/logs', icon: Activity, roles: ['admin'] },
   ]
 
   const filteredNavigation = navigation.filter(item =>

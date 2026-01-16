@@ -42,6 +42,7 @@ export default function Dashboard() {
 
   const fetchDashboardData = async () => {
     try {
+      console.log('🔍 [Dashboard] Début chargement...')
       const today = new Date()
 
       // Shops
@@ -49,7 +50,11 @@ export default function Dashboard() {
         .from('shops')
         .select('status, monthly_rent')
 
-      if (shopsError) throw shopsError
+      if (shopsError) {
+        console.error('❌ [Dashboard] Erreur shops:', shopsError)
+        throw shopsError
+      }
+      console.log('✅ [Dashboard] Shops chargés:', shops?.length, shops)
 
       const totalShops = shops?.length || 0
       const occupiedShops = shops?.filter(s => s.status === 'occupied').length || 0
@@ -62,24 +67,31 @@ export default function Dashboard() {
         .select('*', { count: 'exact', head: true })
         .eq('active', true)
 
-      if (tenantsCountError) throw tenantsCountError
+      if (tenantsCountError) {
+        console.error('❌ [Dashboard] Erreur tenants:', tenantsCountError)
+        throw tenantsCountError
+      }
+      console.log('✅ [Dashboard] Tenants actifs:', totalTenants)
 
       // Active contracts
       const { data: contracts, error: contractsError } = await supabase
         .from('contracts')
-        .select('status, monthly_rent, charges, end_date')
+        .select('status, monthly_rent, end_date')
         .eq('status', 'active')
 
-      if (contractsError) throw contractsError
+      if (contractsError) {
+        console.error('❌ [Dashboard] Erreur contracts:', contractsError)
+        throw contractsError
+      }
+      console.log('✅ [Dashboard] Contrats actifs:', contracts?.length, contracts)
 
       const activeContracts = contracts?.length || 0
 
-      // Monthly revenue = rent + charges (si charges existe)
+      // Monthly revenue = rent seulement (charges retirées car colonne peut ne pas exister)
       const monthlyRevenue =
         contracts?.reduce((sum, c) => {
           const rent = safeNumber(c.monthly_rent)
-          const charges = safeNumber(c.charges)
-          return sum + rent + charges
+          return sum + rent
         }, 0) || 0
 
       // Expiring contracts (<= 90 jours)
@@ -92,15 +104,20 @@ export default function Dashboard() {
         }) || []
 
       // Unpaid invoices: montant + count + overdue count
+      // ATTENTION: Votre base utilise 'amount_total' et statut 'unpaid'
       const { data: unpaidInvoices, error: invoicesError } = await supabase
         .from('invoices')
-        .select('invoice_number, total_amount, due_date, status, tenant:tenants(company_name)')
-        .in('status', ['sent', 'overdue'])
+        .select('invoice_number, amount_total, due_date, status')
+        .in('status', ['unpaid', 'overdue', 'pending', 'sent'])
 
-      if (invoicesError) throw invoicesError
+      if (invoicesError) {
+        console.error('❌ [Dashboard] Erreur invoices:', invoicesError)
+        throw invoicesError
+      }
+      console.log('✅ [Dashboard] Factures impayées:', unpaidInvoices?.length, unpaidInvoices)
 
       const unpaidInvoicesAmount =
-        unpaidInvoices?.reduce((sum, inv) => sum + safeNumber(inv.total_amount), 0) || 0
+        unpaidInvoices?.reduce((sum, inv) => sum + safeNumber(inv.amount_total), 0) || 0
 
       const unpaidInvoicesCount = unpaidInvoices?.length || 0
 
@@ -153,8 +170,19 @@ export default function Dashboard() {
       })
 
       setAlerts(newAlerts)
+      
+      console.log('✅ [Dashboard] Stats finales:', {
+        totalShops,
+        occupiedShops,
+        vacantShops,
+        totalTenants,
+        activeContracts,
+        monthlyRevenue,
+        unpaidInvoicesAmount,
+        unpaidInvoicesCount
+      })
     } catch (error) {
-      console.error('Error fetching dashboard data:', error)
+      console.error('❌ [Dashboard] Exception:', error)
     } finally {
       setLoading(false)
     }
@@ -162,6 +190,12 @@ export default function Dashboard() {
 
   const occupancyRate =
     stats.totalShops > 0 ? ((stats.occupiedShops / stats.totalShops) * 100).toFixed(1) : '0.0'
+
+  const formatMoney = (amount) => {
+    const n = Number(amount)
+    if (Number.isNaN(n)) return '-'
+    return `${n.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} FCFA`
+  }
 
   if (loading) {
     return (
@@ -217,7 +251,7 @@ export default function Dashboard() {
                   <dt className="text-sm font-medium text-gray-500 truncate">Revenu mensuel</dt>
                   <dd className="flex items-baseline">
                     <div className="text-2xl font-semibold text-gray-900">
-                      ${stats.monthlyRevenue.toLocaleString()}
+                      {formatMoney(stats.monthlyRevenue)}
                     </div>
                   </dd>
                 </dl>
@@ -264,7 +298,7 @@ export default function Dashboard() {
                   <dt className="text-sm font-medium text-gray-500 truncate">Factures impayées</dt>
                   <dd className="flex items-baseline">
                     <div className="text-2xl font-semibold text-gray-900">
-                      ${stats.unpaidInvoicesAmount.toLocaleString()}
+                      {formatMoney(stats.unpaidInvoicesAmount)}
                     </div>
                   </dd>
                 </dl>
