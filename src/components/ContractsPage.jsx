@@ -41,7 +41,7 @@ export default function ContractsPage() {
           status,
           notes,
           created_at,
-          tenant:tenants(id, name, email, status),
+          tenant:tenants(id, company_name, contact_name, email, status),
           shop:shops(id, name, shop_number, floor, location)
         `)
         .order('created_at', { ascending: false })

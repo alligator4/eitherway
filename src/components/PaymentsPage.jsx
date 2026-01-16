@@ -38,7 +38,7 @@ export default function PaymentsPage() {
           notes,
           created_at,
           invoice:invoices(id, invoice_number, amount_total, currency),
-          tenant:tenants(id, name)
+          tenant:tenants(id, company_name, contact_name)
         `)
         .order('paid_at', { ascending: false })
 

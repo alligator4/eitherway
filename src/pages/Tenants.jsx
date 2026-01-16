@@ -26,7 +26,7 @@ export default function Tenants() {
 
     const channel = supabase
       .channel('tenants-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tenants' }, () => {
         fetchTenants()
       })
       .subscribe()
@@ -38,30 +38,26 @@ export default function Tenants() {
 
   const fetchTenants = async () => {
     try {
-      console.log('Fetching tenants...')
+      console.log('✅ Chargement des locataires depuis la table tenants...')
 
-      // Récupérer tous les profils d'abord
-      const { data: allProfiles, error: allError } = await supabase
-        .from('profiles')
-        .select('*')
+      const { data, error } = await supabase
+        .from('tenants')
+        .select(`
+          *,
+          profile:profiles(email, full_name, role)
+        `)
+        .order('company_name', { ascending: true })
 
-      console.log('All profiles in database:', allProfiles, 'Error:', allError)
-
-      if (allError) {
-        console.error('Error fetching all profiles:', allError)
+      if (error) {
+        console.error('❌ Erreur chargement locataires:', error)
         setTenants([])
         return
       }
 
-      // Appliquer le filtre côté client pour éviter les problèmes de requête
-      const filteredProfiles = allProfiles.filter(profile =>
-        profile.role !== 'admin'
-      )
-
-      console.log('Filtered tenants (client-side):', filteredProfiles)
-      setTenants(filteredProfiles)
+      console.log('✅ Locataires chargés:', data?.length || 0, data)
+      setTenants(data || [])
     } catch (err) {
-      console.error('Error in fetchTenants:', err)
+      console.error('❌ Erreur in fetchTenants:', err)
       setTenants([])
     } finally {
       setLoading(false)
@@ -253,8 +249,17 @@ export default function Tenants() {
         </div>
 
         {canEdit && (
-          <div className="text-sm text-gray-600">
-            Les locataires sont créés automatiquement lors de l'inscription
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={fixMissingEmails}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+            >
+              <Mail className="h-4 w-4 mr-2" />
+              Corriger emails manquants
+            </button>
+            <div className="text-sm text-gray-600">
+              Les locataires sont créés automatiquement lors de l'inscription
+            </div>
           </div>
         )}
       </div>

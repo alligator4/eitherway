@@ -58,7 +58,7 @@ export default function InvoiceModal({ invoice, onClose, onSuccess }) {
           currency,
           tenant_id,
           shop_id,
-          tenant:tenants(name),
+          tenant:tenants(company_name, contact_name),
           shop:shops(shop_number, name),
           status
         `)
@@ -73,11 +73,13 @@ export default function InvoiceModal({ invoice, onClose, onSuccess }) {
   }
 
   const contractLabel = (c) => {
-    const tenantName = c.tenant?.name || 'Locataire'
+    const tenantName = c.tenant?.company_name || 'Locataire'
+    const contactName = c.tenant?.contact_name ? ` (${c.tenant.contact_name})` : ''
+    const fullTenantName = `${tenantName}${contactName}`
     const shopLabel = c.shop?.shop_number || c.shop?.name || 'Local'
     const title = (c.title || '').trim()
-    if (title) return `${title} - ${tenantName} - ${shopLabel}`
-    return `${tenantName} - ${shopLabel}`
+    if (title) return `${title} - ${fullTenantName} - ${shopLabel}`
+    return `${fullTenantName} - ${shopLabel}`
   }
 
   const handleContractSelect = (contractId) => {

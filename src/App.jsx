@@ -1,5 +1,10 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './lib/AuthContext'
+import { ToastProvider } from './contexts/ToastContext'
+import { NotificationProvider } from './contexts/NotificationContext'
+import { ThemeProvider } from './contexts/ThemeContext'
+import ErrorBoundary from './components/ErrorBoundary'
+import LoadingSpinner from './components/LoadingSpinner'
 import ProtectedRoute from './components/ProtectedRoute'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
@@ -16,18 +21,11 @@ import InvoicesPage from './components/InvoicesPage'
 import PaymentsPage from './components/PaymentsPage'
 import ActivityLogsPage from './components/ActivityLogsPage'
 
-export default function App() {
+function AppContent() {
   const { loading } = useAuth()
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Chargement...</p>
-        </div>
-      </div>
-    )
+    return <LoadingSpinner fullScreen text="Chargement de l'application..." />
   }
 
   return (
@@ -95,5 +93,19 @@ export default function App() {
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+  )
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <ThemeProvider>
+        <ToastProvider>
+          <NotificationProvider>
+            <AppContent />
+          </NotificationProvider>
+        </ToastProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   )
 }

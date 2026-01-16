@@ -13,12 +13,17 @@ export default function ShopModal({ shop, onClose, onSuccess }) {
     activity_category: '',
     monthly_rent: '',
     description: '',
+    tenant_id: '',
   })
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [tenants, setTenants] = useState([])
+  const [loadingTenants, setLoadingTenants] = useState(false)
 
   useEffect(() => {
+    fetchTenants()
+    
     if (!shop) {
       setFormData({
         shop_number: '',
@@ -30,6 +35,7 @@ export default function ShopModal({ shop, onClose, onSuccess }) {
         activity_category: '',
         monthly_rent: '',
         description: '',
+        tenant_id: '',
       })
       return
     }
@@ -44,14 +50,82 @@ export default function ShopModal({ shop, onClose, onSuccess }) {
       activity_category: shop.activity_category || '',
       monthly_rent: shop.monthly_rent ?? '',
       description: shop.description || '',
+      tenant_id: '',
     })
   }, [shop])
+
+  const fetchTenants = async () => {
+    setLoadingTenants(true)
+    try {
+      console.log('🔍 Chargement des locataires...')
+      
+      const { data, error } = await supabase
+        .from('tenants')
+        .select('id, company_name, contact_name, active')
+        .eq('active', true)
+        .order('company_name', { ascending: true })
+
+      if (error) {
+        console.error('❌ Erreur chargement locataires:', error)
+        throw error
+      }
+      
+      console.log('✅ Locataires chargés:', data?.length || 0, data)
+      setTenants(data || [])
+    } catch (err) {
+      console.error('❌ Exception chargement locataires:', err)
+      setTenants([])
+    } finally {
+      setLoadingTenants(false)
+    }
+  }
 
   const toNumberOrNull = (v) => {
     const s = String(v ?? '').trim()
     if (!s) return null
     const n = Number(s)
     return Number.isNaN(n) ? null : n
+  }
+
+  const createContract = async (shopId, tenantId, monthlyRent) => {
+    try {
+      const { data: existingContract } = await supabase
+        .from('contracts')
+        .select('id')
+        .eq('shop_id', shopId)
+        .eq('status', 'active')
+        .single()
+
+      if (existingContract) {
+        console.log('Un contrat actif existe déjà pour ce local')
+        return
+      }
+
+      const today = new Date()
+      const oneYearLater = new Date(today)
+      oneYearLater.setFullYear(oneYearLater.getFullYear() + 1)
+
+      const { error: contractError } = await supabase
+        .from('contracts')
+        .insert([{
+          tenant_id: tenantId,
+          shop_id: shopId,
+          start_date: today.toISOString().split('T')[0],
+          end_date: oneYearLater.toISOString().split('T')[0],
+          monthly_rent: monthlyRent || 0,
+          deposit: monthlyRent ? monthlyRent * 2 : 0,
+          charges: 0,
+          payment_day: 1,
+          status: 'active',
+          auto_renewal: false,
+          contract_type: 'commercial',
+        }])
+
+      if (contractError) throw contractError
+      console.log('✅ Contrat créé automatiquement')
+    } catch (err) {
+      console.error('Erreur création contrat:', err)
+    }
   }
 
   const handleSubmit = async (e) => {
@@ -63,6 +137,12 @@ export default function ShopModal({ shop, onClose, onSuccess }) {
       const surface = toNumberOrNull(formData.surface_area)
       if (surface === null) {
         setError('La surface est obligatoire.')
+        setLoading(false)
+        return
+      }
+
+      if (formData.status === 'occupied' && !formData.tenant_id) {
+        setError('Veuillez sélectionner un locataire pour un local occupé.')
         setLoading(false)
         return
       }
@@ -85,15 +165,17 @@ export default function ShopModal({ shop, onClose, onSuccess }) {
         return
       }
       if (!shopData.floor) {
-        setError('L’étage est obligatoire.')
+        setError('L'étage est obligatoire.')
         setLoading(false)
         return
       }
       if (!shopData.location) {
-        setError('L’emplacement est obligatoire.')
+        setError('L'emplacement est obligatoire.')
         setLoading(false)
         return
       }
+
+      let shopId = shop?.id
 
       if (shop) {
         const { error: updateError } = await supabase
@@ -105,11 +187,18 @@ export default function ShopModal({ shop, onClose, onSuccess }) {
       } else {
         const { data: { user } } = await supabase.auth.getUser()
 
-        const { error: insertError } = await supabase
+        const { data: newShop, error: insertError } = await supabase
           .from('shops')
           .insert([{ ...shopData, created_by: user?.id || null }])
+          .select()
+          .single()
 
         if (insertError) throw insertError
+        shopId = newShop.id
+      }
+
+      if (formData.status === 'occupied' && formData.tenant_id && shopId) {
+        await createContract(shopId, formData.tenant_id, shopData.monthly_rent)
       }
 
       onSuccess()
@@ -171,9 +260,45 @@ export default function ShopModal({ shop, onClose, onSuccess }) {
               >
                 <option value="vacant">Disponible</option>
                 <option value="occupied">Occupé</option>
+                <option value="reserved">Réservé</option>
                 <option value="under_renovation">En rénovation</option>
               </select>
             </div>
+
+            {formData.status === 'occupied' && (
+              <div>
+                <label className="label">
+                  Locataire <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.tenant_id}
+                  onChange={(e) => setFormData({ ...formData, tenant_id: e.target.value })}
+                  className={`input-field ${formData.status === 'occupied' && !formData.tenant_id ? 'border-red-500' : ''}`}
+                  required
+                  disabled={loadingTenants}
+                >
+                  <option value="">-- Sélectionnez un locataire --</option>
+                  {tenants.map((tenant) => (
+                    <option key={tenant.id} value={tenant.id}>
+                      {tenant.company_name} ({tenant.contact_name})
+                    </option>
+                  ))}
+                </select>
+                {loadingTenants && (
+                  <p className="text-sm text-gray-500 mt-1">Chargement des locataires...</p>
+                )}
+                {tenants.length === 0 && !loadingTenants && (
+                  <p className="text-sm text-amber-600 mt-1">
+                    ⚠️ Aucun locataire disponible. Créez d'abord un locataire dans la page "Locataires".
+                  </p>
+                )}
+                {formData.status === 'occupied' && !formData.tenant_id && (
+                  <p className="text-sm text-red-600 mt-1">
+                    Veuillez sélectionner un locataire pour un local occupé
+                  </p>
+                )}
+              </div>
+            )}
 
             <div>
               <label className="label">Surface (m²)</label>
@@ -207,13 +332,13 @@ export default function ShopModal({ shop, onClose, onSuccess }) {
                 value={formData.location}
                 onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                 className="input-field"
-                placeholder="Ex: Aile Nord, près de l’entrée"
+                placeholder="Ex: Aile Nord, près de l'entrée"
                 required
               />
             </div>
 
             <div>
-              <label className="label">Catégorie d’activité (optionnel)</label>
+              <label className="label">Catégorie d'activité (optionnel)</label>
               <input
                 type="text"
                 value={formData.activity_category}

@@ -31,10 +31,20 @@ export default function TenantsPage() {
         .select('*')
         .order('company_name', { ascending: true })
 
-      if (error) throw error
+      if (error) {
+        console.error('❌ Erreur chargement locataires:', error)
+        console.error('Code:', error.code)
+        console.error('Message:', error.message)
+        console.error('Details:', error.details)
+        console.error('Hint:', error.hint)
+        throw error
+      }
+      
+      console.log('✅ Locataires chargés:', data?.length || 0)
       setTenants(Array.isArray(data) ? data : [])
     } catch (error) {
-      console.error('Erreur chargement locataires:', error)
+      console.error('❌ Erreur chargement locataires:', error)
+      alert('Erreur lors du chargement des locataires. Vérifiez la console (F12) pour plus de détails.')
       setTenants([])
     } finally {
       setLoading(false)
@@ -87,10 +97,12 @@ export default function TenantsPage() {
       <div className="flex items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold text-gray-900">Locataires</h2>
-          <p className="text-gray-600 mt-1">Gérer les informations des commerçants</p>
+          <p className="text-gray-600 mt-1">
+            Les locataires sont créés automatiquement lors de l'inscription
+          </p>
         </div>
 
-        {canManage ? (
+        {canManage && false ? (
           <button
             type="button"
             onClick={() => {
@@ -98,6 +110,8 @@ export default function TenantsPage() {
               setShowModal(true)
             }}
             className="btn-primary flex items-center gap-2"
+            disabled
+            title="Les locataires sont créés automatiquement via l'inscription"
           >
             <Plus className="w-5 h-5" />
             Ajouter un locataire

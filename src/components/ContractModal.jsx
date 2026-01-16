@@ -61,25 +61,37 @@ export default function ContractModal({ contract, onClose, onSuccess }) {
         supabase
           .from('shops')
           .select('id, name, shop_number, floor, location')
-          .order('name', { ascending: true }),
+          .order('shop_number', { ascending: true }),
         supabase
           .from('tenants')
-          .select('id, name, status')
-          .order('name', { ascending: true }),
+          .select('id, company_name, contact_name, active')
+          .eq('active', true)
+          .order('company_name', { ascending: true }),
       ])
 
-      if (shopsRes.error) throw shopsRes.error
-      if (tenantsRes.error) throw tenantsRes.error
+      if (shopsRes.error) {
+        console.error('Erreur chargement shops:', shopsRes.error)
+        throw shopsRes.error
+      }
+      if (tenantsRes.error) {
+        console.error('Erreur chargement tenants:', tenantsRes.error)
+        throw tenantsRes.error
+      }
+
+      console.log('✅ Shops chargés:', shopsRes.data?.length || 0)
+      console.log('✅ Tenants chargés:', tenantsRes.data?.length || 0, tenantsRes.data)
 
       setShops(Array.isArray(shopsRes.data) ? shopsRes.data : [])
       setTenants(Array.isArray(tenantsRes.data) ? tenantsRes.data : [])
     } catch (err) {
-      console.error('Erreur de chargement (shops/tenants):', err)
+      console.error('❌ Erreur de chargement (shops/tenants):', err)
+      setShops([])
+      setTenants([])
     }
   }
 
   const activeTenants = useMemo(() => {
-    return tenants.filter((t) => (t.status || 'active') === 'active')
+    return tenants
   }, [tenants])
 
   const handleSubmit = async (e) => {
@@ -220,7 +232,7 @@ export default function ContractModal({ contract, onClose, onSuccess }) {
                   <option value="">Sélectionner un locataire</option>
                   {activeTenants.map((tenant) => (
                     <option key={tenant.id} value={tenant.id}>
-                      {tenant.name}
+                      {tenant.company_name} {tenant.contact_name ? `(${tenant.contact_name})` : ''}
                     </option>
                   ))}
                 </select>

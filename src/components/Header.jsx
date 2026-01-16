@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { LogOut, User, Bell } from 'lucide-react'
+import { LogOut, User, Moon, Sun } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
+import { useTheme } from '../contexts/ThemeContext'
+import NotificationBell from './NotificationBell'
 
 export default function Header({ profile }) {
   const { signOut } = useAuth()
+  const { theme, toggleTheme } = useTheme()
   const [showMenu, setShowMenu] = useState(false)
   const menuRef = useRef(null)
-
-  const hasNotifications = false
 
   useEffect(() => {
     const onClickOutside = (e) => {
@@ -61,15 +62,18 @@ export default function Header({ profile }) {
         <div className="flex items-center gap-4">
           <button
             type="button"
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors relative"
-            aria-label="Notifications"
-            onClick={() => {}}
+            onClick={toggleTheme}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            aria-label="Changer de thème"
           >
-            <Bell className="w-5 h-5 text-gray-600" />
-            {hasNotifications ? (
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-            ) : null}
+            {theme === 'dark' ? (
+              <Sun className="w-5 h-5 text-gray-600" />
+            ) : (
+              <Moon className="w-5 h-5 text-gray-600" />
+            )}
           </button>
+
+          <NotificationBell />
 
           <div className="relative" ref={menuRef}>
             <button

@@ -34,7 +34,7 @@ export default function PaymentModal({ onClose, onSuccess }) {
           currency,
           status,
           due_date,
-          tenant:tenants(name),
+          tenant:tenants(company_name, contact_name),
           shop:shops(shop_number, name)
         `)
         .in('status', ['unpaid', 'partial', 'overdue'])
@@ -206,7 +206,7 @@ export default function PaymentModal({ onClose, onSuccess }) {
                 <option value="">Sélectionner une facture</option>
                 {invoices.map((inv) => (
                   <option key={inv.id} value={inv.id}>
-                    {inv.invoice_number} - {inv.tenant?.name || 'Locataire'} - {formatMoney(inv.amount_total, inv.currency)} ({statusLabel(inv.status)})
+                    {inv.invoice_number} - {inv.tenant?.company_name || 'Locataire'} {inv.tenant?.contact_name ? `(${inv.tenant.contact_name})` : ''} - {formatMoney(inv.amount_total, inv.currency)} ({statusLabel(inv.status)})
                   </option>
                 ))}
               </select>

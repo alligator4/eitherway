@@ -42,7 +42,7 @@ export default function InvoicesPage() {
           status,
           description,
           created_at,
-          tenant:tenants(id, name, email),
+          tenant:tenants(id, company_name, contact_name, email),
           shop:shops(id, shop_number, name),
           contract:contracts(id, title)
         `)
