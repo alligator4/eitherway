@@ -10,7 +10,6 @@ import Login from './pages/Login'
 import Signup from './pages/Signup'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
-import TestPasswordReset from './pages/TestPasswordReset'
 import Dashboard from './pages/Dashboard'
 import Layout from './components/Layout'
 import ShopsPage from './pages/Shops'
@@ -31,8 +30,6 @@ function AppContent() {
       <Route path="/signup" element={<Signup />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="/test-password-reset" element={<TestPasswordReset />} />
-      <Route path="/test-contracts" element={<TestContracts />} />
 
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route path="/" element={<Dashboard />} />
